@@ -21,7 +21,7 @@ static int read1byte(FILE *fp, char *result, int len)
 	return resp;
 }
 
-static int read2byte(FILE *fp, u16 *result)
+static int read2byte(FILE *fp, short *result)
 {
 	u8 buf[2];
 	fread(buf, 1, 2, fp);
@@ -65,7 +65,7 @@ int wav_readfile(WavHeader *header, char *fn)
 	}
 	read1byte(fp, header->data_chnk, 4);			// data chunk
 	read4byte(fp, &header->Nbyte);
-	header->data = calloc(header->Nbyte, sizeof(u16));
+	header->data = calloc(header->Nbyte, sizeof(short));
 	if ((ie = read1byte(fp, (char *)header->data, header->Nbyte)) < header->Nbyte)
 		ie = 1;
 	fclose(fp);

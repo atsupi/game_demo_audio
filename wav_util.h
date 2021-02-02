@@ -28,7 +28,7 @@ typedef struct {
 	u8		*cbuf;
 	u8		data_chnk[4];
 	u32		Nbyte;
-	u16		*data;
+	short	*data;
 } WavHeader;
 
 extern int wav_readfile(WavHeader *header, char *fn);

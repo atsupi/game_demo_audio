@@ -568,7 +568,8 @@ int main(int argc, char *argv[])
 	printf("Initialize audio component\n");
 	azplf_audio_init();
 	azplf_audio_initSSM2603();
-	i2sout_senddata(0, 0xFE000000); // debug=254 (no invert data), mute=0, lr_mode=R only
+//	i2sout_senddata(0, 0xFE000000); // debug=254 (no invert data), mute=0, lr_mode=R only
+	i2sout_senddata(0, 0xFF000000); // debug=255 (invert data), mute=0, lr_mode=R only
 
 	// Test conversion from bitmap to png
 //	TestPngFileConversion();

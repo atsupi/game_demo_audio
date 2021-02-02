@@ -65,7 +65,7 @@ void PlayWavFile(char *fn)
 	u32 ldata;
 	u32 stat;
 	int i;
-	u16 sdata;
+	float sdata;
 
 	result = wav_readfile(&wavheader, fn /*"test.wav"*/);
 	if (wavheader.bit != WAV_BITS)
@@ -78,7 +78,7 @@ void PlayWavFile(char *fn)
 		while ((stat = i2sout_getstatus(0x0C) & 0xC));
 
 		sdata = wavheader.data[i];
-		sdata = sdata * (volume + 1) / 16; // attenuator
+		sdata = sdata * (volume + 1) / 16.0; // attenuator
 		// bit debug[0] inverts the MSB of I2S data
 		ldata = (u32)sdata;
 		ldata = ((ldata & 0xFFFF) << 16) | (ldata & 0xFFFF);
