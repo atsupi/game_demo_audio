@@ -44,6 +44,8 @@ static int fbBackgd;
 
 // flag for wav file playback
 static int wavfile_played = 0;
+static WavHeader wavheader;
+static int wav_pos = 0;
 
 static int quit = 0;
 
@@ -289,18 +291,8 @@ static void DrawMap(int fbNum)
 
 static void DrawTestFrame(int fbNum)
 {
-	int i, j;
-
-    for (i = 0; i < 480 / 16; i++)
-    {
-    	for (j = 0; j < 800 / 16; j++)
-    	{
-    		gfxaccel_bitblt(&gfxaccelInst, 
-				ResourceAddr, j * 16, (i /*% 15*/) * 16, 16, 16, 
-				WriteFrameAddr[fbNum], j * 16, i * 16, 
-				GFXACCEL_BB_NONE);
-    	}
-    }
+    gfxaccel_fill_rect(&gfxaccelInst, WriteFrameAddr[fbNum],
+		 0,  0, 799, 479, RGB8(16, 16, 16));
 
     // Invoke fill rectangle accelerator
     gfxaccel_fill_rect(&gfxaccelInst, WriteFrameAddr[fbNum],
@@ -316,6 +308,36 @@ static void DrawTestFrame(int fbNum)
 		480, 240, 481, 399, RGB8(255, 255, 255));
 }
 
+static float vol_curve[] = { 0, 1, 4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144, 169, 204, 256.0 };
+
+void PlayTestWav(void)
+{
+	int len = 800 + 80; // 48kHz / 60Hz = 800frame. adds 10 percent frames to avoid data underflow.
+	float sdata;
+	u32 stat;
+	u32 ldata;
+	int i;
+	int volume = azplf_audio_get_volume();
+
+	if (wav_pos + len > wavheader.Nbyte/2) {
+		len = wavheader.Nbyte/2 - wav_pos;
+		// last frame is played here.
+		wavfile_played = 1;
+	}
+
+	for (i = 0; i < len; i++)
+	{
+		while ((stat = i2sout_getstatus(0x0C) & 0xC));
+
+		sdata = wavheader.data[wav_pos + i];
+		sdata = sdata * vol_curve[volume] / 256; // attenuator
+		ldata = (u32)sdata;
+		ldata = ((ldata & 0xFFFF) << 16) | (ldata & 0xFFFF);
+		i2sout_senddata(4, ldata);
+	}
+	wav_pos += len;
+}
+
 static char mml[] = "cegefdggcegefdgrcegefdggcegefdcr";
 static float freq[8] = { 261.626, 293.665, 329.628, 349.228, 391.995, 440.0, 493.883, 523.251 };
 int sound_pos = 0;
@@ -326,6 +348,8 @@ void PlayMusic(int pos)
 	float len;
 	char note = mml[pos];
 	int note_p;
+	int vol = azplf_audio_get_volume();
+	float data;
 
 	if (note == 'r') return;
 
@@ -337,11 +361,13 @@ void PlayMusic(int pos)
 	len = 48000.0 / freq[note_p];
 	len /= 2;
 
+	data = 0x2000 * vol_curve[vol] / 256;
+
 	if (len > 1745) return;
 
 	for (j = 0; j < 50; j++) {
 		for (i = 0; i < (int)len; i++)
-			i2sout_senddata(4, 0x10001000); // L=0x2000; R=0x2000
+			i2sout_senddata(4, ((u16)data << 16) | (u16)data); // L=data; R=data
 		for (i = 0; i < (int)len; i++)
 			i2sout_senddata(4, 0x00000000); // L=0x0000; R=0x0000
    	}
@@ -355,8 +381,7 @@ static void UpdateAudio(int scene)
 	len = sizeof(mml) - 1;
 
 	if (scene == 0) {
-		if (!wavfile_played) PlayWavFile("res/test.wav");
-		wavfile_played = 1;
+		if (!wavfile_played) PlayTestWav();
 	} else if (scene == 1) {
 		switch (mode) {
 		case 0:
@@ -374,11 +399,15 @@ static void UpdateAudio(int scene)
 
 static void UpdateFrame(int scene)
 {
+	static u32 prev_time = 0;
+	u32 systime = game_get_systemtime();
 	static int x = 0;
 	static int y = 0;
 	int i, j;
 	int status;
-	u32 systime;
+
+	if (prev_time == systime) return;
+	prev_time = systime;
 
 	UpdateAudio(scene);
 
@@ -388,6 +417,9 @@ static void UpdateFrame(int scene)
 		DrawTestFrame(fbBackgd);
 		drawTrianglePolygons(fbBackgd);
 		drawText(WriteFrameAddr[fbBackgd], 176, 448, "\x80\x80\x80 2021 (c) ATSUPI.COM \x80\x80\x80");
+		DrawDebugInfo(fbBackgd);
+		systime = game_get_systemtime();
+		drawSprite(&Sprite2, WriteFrameAddr[fbBackgd], systime);
 		break;
 
 	case 1:
@@ -419,7 +451,7 @@ static void UpdateFrame(int scene)
 		break;
 	}
 
-	// switch display frame on double buffer
+	// double buffering: switch background frame to active frame.
 	fbActive ^= 1;
 	fbBackgd ^= 1;
 	status = vdma_start_parking(&vdmaInst_0, VDMA_READ, fbActive);
@@ -447,7 +479,6 @@ static void TestPngFileConversion(void)
 int main(int argc, char *argv[])
 {
 	int i, j;
-	u32 size = FRAME_HORIZONTAL_LEN * FRAME_VERTICAL_LEN;
 	int status;
 	int mode;
 	u32 ReadAddr;
@@ -456,17 +487,18 @@ int main(int argc, char *argv[])
 	pos basePos;
 	u32 time;
 
+	printf("\r\n--- Entering main() --- \r\n");
 	mode = parse_argument(argc, argv);
 
+	// setup frame buffer address
 	WriteFrameAddr[0] = WRITE_ADDRESS_BASE;
 	WriteFrameAddr[1] = WRITE_ADDRESS_BASE + frame_page;
 	ResourceAddr      = WriteFrameAddr[1]  + frame_page;
 	CamFrameAddr      = ResourceAddr + frame_page;
 
+	// decide active/background frame
 	fbActive = 0;
 	fbBackgd = 1;
-
-	printf("\r\n--- Entering main() --- \r\n");
 
 	/* The information of the XAxiVdma_Config comes from hardware build.
 	 * The user IP should pass this information to the AXI DMA core.
@@ -526,6 +558,7 @@ int main(int argc, char *argv[])
     // Clear frame buffer
     printf("Clear frame buffer\r\n");
     gfxaccel_fill_rect(&gfxaccelInst, WriteFrameAddr[0], 0, 0, 799, 479, 0x0);
+    gfxaccel_fill_rect(&gfxaccelInst, WriteFrameAddr[1], 0, 0, 799, 479, 0x0);
 
     // Setup Resource frame
     printf("Setup Resource frame buffer\r\n");
@@ -574,6 +607,10 @@ int main(int argc, char *argv[])
 	// Test conversion from bitmap to png
 //	TestPngFileConversion();
 
+	if (!azplf_audio_load_wav("res/test.wav", &wavheader)) {
+		quit = 1;
+	}
+
 	sleep(1); // 1sec wait before starting game work thread
 
 	status = azplf_start_game_thread(INITIAL_SCENE, UpdateFrame);
@@ -588,7 +625,7 @@ int main(int argc, char *argv[])
 		} while (ch == '\r' || ch == '\n');
 
 		switch (game_get_scene()) {
-		case 0:
+		case 0: // start screen
 			if (ch == 'x') {
 				game_set_next_scene(2);
 				usleep(50000);
@@ -602,12 +639,23 @@ int main(int argc, char *argv[])
 				printf("Command not found\r\n");
 			}
 			break;
-		case 1:
+		case 1: // game main
 			if (ch == 0x1b || ch == 'e') { // ESC
 				game_set_next_scene(0);
+				wav_pos = 0;
+				wavfile_played = 0;
+			} else if (ch == '1') { // volume down
+				int vol = azplf_audio_get_volume() - 1;
+				azplf_audio_set_volume(vol);
+			} else if (ch == '2') { // volume up
+				int vol = azplf_audio_get_volume() + 1;
+				azplf_audio_set_volume(vol);
 			} else {
 				printf("Command not found\r\n");
 			}
+			break;
+		case 2: // ending screen
+			// do nothing
 			break;
 		default:
 			break;
@@ -620,6 +668,7 @@ int main(int argc, char *argv[])
 	// draw ending screen
     printf("--- Exiting main() --- \r\n");
 
+	azplf_audio_free_wav(&wavheader);
 	azplf_game_deinit();
 	azplf_audio_deinit();
 	gfxaccel_deinit(&gfxaccelInst);

@@ -74,6 +74,12 @@ int wav_readfile(WavHeader *header, char *fn)
 
 void free_wavheader(WavHeader *header)
 {
-	if (header->cbuf) free(header->cbuf);
-	if (header->data) free(header->data);
+	if (header->cbuf) {
+		free(header->cbuf);
+		header->cbuf = 0;
+	}
+	if (header->data) {
+		free(header->data);
+		header->data = 0;
+	}
 }

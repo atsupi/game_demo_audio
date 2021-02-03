@@ -41,9 +41,9 @@ static u32 ProcessTime(void)
 	printf("current time=%d:%d\n", (int)curr_time.tv_sec, (int)curr_time.tv_usec);
 #endif
 	duration = (curr_time.tv_sec - start_time.tv_sec) * 1000000.0 + (curr_time.tv_usec - start_time.tv_usec);
-	duration -= system_time * 16000.0;
+	duration -= system_time * 16666.7;
 
-	system_time += duration / 16000.0;
+	system_time += duration / 16666.7;
 	if (system_time == 0xffffffff) {
 		printf("system time is negative\n");
 		// system time is modified after booting

@@ -58,6 +58,30 @@ int azplf_audio_get_volume(void)
 	return (volume);
 }
 
+void azplf_audio_free_wav(WavHeader *wav)
+{
+	free_wavheader(wav);
+}
+
+int azplf_audio_load_wav(char *fn, WavHeader *wav)
+{
+	int result;
+	u32 ldata;
+	u32 stat;
+	int i;
+	float sdata;
+
+	result = wav_readfile(wav, fn /*"test.wav"*/);
+	if (wav->bit != WAV_BITS)
+	{
+		printf("Error: bit width is not 16.\r\n");
+		azplf_audio_free_wav(wav);
+		return 0;
+	}
+
+	return 1;
+}
+
 void PlayWavFile(char *fn)
 {
 	int result;

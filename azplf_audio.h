@@ -21,6 +21,8 @@ extern void azplf_audio_deinit(void);
 extern void azplf_audio_set_volume(int value);
 extern int azplf_audio_get_volume(void);
 extern void azplf_audio_initSSM2603(void);
+extern void azplf_audio_free_wav(WavHeader *wav);
+extern int azplf_audio_load_wav(char *fn, WavHeader *wav);
 extern void PlayWavFile(char *fn);
 
 extern u8 i2c_read1byte(u8 address);
