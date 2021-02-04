@@ -13,17 +13,16 @@
 #define InputClockHz				108333336
 
 // Register offsets for the IIC PS
-#define IICPS_CR_OFFSET					0x00
-#define IICPS_SR_OFFSET					0x04
-#define IICPS_ADDR_OFFSET				0x08
-#define IICPS_DATA_OFFSET				0x0C
-#define IICPS_ISR_OFFSET				0x10
-#define IICPS_TRANS_SIZE_OFFSET			0x14
-#define IICPS_SLV_PAUSE_OFFSET			0x18
-#define IICPS_TIME_OUT_OFFSET			0x1C
-#define IICPS_IMR_OFFSET				0x20
-#define IICPS_IER_OFFSET				0x24
-#define IICPS_IDR_OFFSET				0x28
+#define IICPS_CTRL_REG					0x00
+#define IICPS_STATUS_REG				0x04
+#define IICPS_ADDRESS_REG				0x08
+#define IICPS_DATA_REG					0x0C
+#define IICPS_ISR_REG					0x10
+#define IICPS_TRANS_SIZE_REG			0x14
+#define IICPS_TIME_OUT_REG				0x1C
+#define IICPS_IMR_REG					0x20
+#define IICPS_IER_REG					0x24
+#define IICPS_IDR_REG					0x28
 
 // definitions for Control Register
 #define IICPS_CR_HOLD					0x00000010

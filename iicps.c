@@ -52,13 +52,13 @@ static void iicps_writereg(u32 adr, u32 offset, u32 value)
 
 static void iicps_sendbyte(BaseAddress)
 {
-	iicps_writereg((BaseAddress), IICPS_DATA_OFFSET, *SendBufferPtr++);
+	iicps_writereg((BaseAddress), IICPS_DATA_REG, *SendBufferPtr++);
 	SendByteCount--;
 }
 
 static void iicps_recvbyte(BaseAddress)
 {
-	*RecvBufferPtr++ = (u8)iicps_readreg(BaseAddress, IICPS_DATA_OFFSET);
+	*RecvBufferPtr++ = (u8)iicps_readreg(BaseAddress, IICPS_DATA_REG);
 	RecvByteCount--;
 }
 
@@ -68,19 +68,19 @@ void iicps_abort(u32 BaseAddr)
 	u32 status;
 
 	// Pause all of interrupts
-	maskreg = iicps_readreg(BaseAddr, IICPS_IMR_OFFSET);
-	iicps_writereg(BaseAddr, IICPS_IDR_OFFSET, 0x2FF);
+	maskreg = iicps_readreg(BaseAddr, IICPS_IMR_REG);
+	iicps_writereg(BaseAddr, IICPS_IDR_REG, 0x2FF);
 
 	// Reset control register and clear FIFO
-	iicps_writereg(BaseAddr, IICPS_CR_OFFSET, 0x40);
+	iicps_writereg(BaseAddr, IICPS_CTRL_REG, 0x40);
 
 	// Read and write interrupt status to consume all of interrupts
-	status = iicps_readreg(BaseAddr, IICPS_ISR_OFFSET);
-	iicps_writereg(BaseAddr, IICPS_ISR_OFFSET, status);
+	status = iicps_readreg(BaseAddr, IICPS_ISR_REG);
+	iicps_writereg(BaseAddr, IICPS_ISR_REG, status);
 
 	// Restore interrupt status
 	maskreg &= ~maskreg;
-	iicps_writereg(BaseAddr, IICPS_IER_OFFSET, maskreg);
+	iicps_writereg(BaseAddr, IICPS_IER_REG, maskreg);
 }
 
 void iicps_reset(u32 BaseAddr)
@@ -89,19 +89,19 @@ void iicps_reset(u32 BaseAddr)
 	iicps_abort(BaseAddr);
 
 	// Reset registers
-	iicps_writereg(BaseAddr, IICPS_CR_OFFSET, 0);
-	iicps_writereg(BaseAddr, IICPS_TIME_OUT_OFFSET, 0x1F);
-	iicps_writereg(BaseAddr, IICPS_IDR_OFFSET, 0x000002FF);
+	iicps_writereg(BaseAddr, IICPS_CTRL_REG, 0);
+	iicps_writereg(BaseAddr, IICPS_TIME_OUT_REG, 0x1F);
+	iicps_writereg(BaseAddr, IICPS_IDR_REG, 0x000002FF);
 }
 
 static u32 slcr_readreg(u32 adr, u32 offset)
 {
-	return (*(volatile unsigned int *)(adr + offset));
+	return (*(volatile u32 *)(adr + offset));
 }
 
 static void slcr_writereg(u32 adr, u32 offset, u32 value)
 {
-	*(volatile unsigned int *)(adr + offset) = value;
+	*(volatile u32 *)(adr + offset) = value;
 #if defined (_DEBUG)
 	u32 data = slcr_readreg(adr, offset);
 	printf("slcr_readreg(offset:0x%04x) %x : readreg 0x%x\n", offset, value, data);
@@ -156,238 +156,168 @@ static int iicps_setup_master(u32 BaseAddr, int Role)
 {
 	u32 ControlReg;
 
-//	// Check if HOLD bit is not set.
-	ControlReg = iicps_readreg(BaseAddr, IICPS_CR_OFFSET);
-//	if ((ControlReg & IICPS_CR_HOLD) == 0 && iicps_isbusy(BaseAddr))
-//			return PST_FAILURE;
+	ControlReg = iicps_readreg(BaseAddr, IICPS_CTRL_REG);
 
-	// Configure master mode
-	ControlReg |= 0x4E;
-
+	ControlReg |= 0x4E;			// Configure master mode
 	if (Role == RX)
 		ControlReg |= 0x01;
 	else
 		ControlReg &= 0xFFFFFFFE;
 
-	iicps_writereg(BaseAddr, IICPS_CR_OFFSET, ControlReg);
-	iicps_writereg(BaseAddr, IICPS_IDR_OFFSET, 0x000002FF);
+	iicps_writereg(BaseAddr, IICPS_CTRL_REG, ControlReg);
+	iicps_writereg(BaseAddr, IICPS_IDR_REG, 0x000002FF);
 
 	return PST_SUCCESS;
 }
 
 static int TransmitFifoFill(u32 BaseAddress)
 {
-	u8 AvailBytes;
-	int LoopCnt;
+	u8 NumBytes;
+	int i;
 	int NumBytesToSend;
 
-	/*
-	 * Determine number of bytes to write to FIFO.
-	 */
-	AvailBytes = IICPS_FIFO_DEPTH -
-		iicps_readreg(BaseAddress, IICPS_TRANS_SIZE_OFFSET);
+	// Number of bytes to write to FIFO.
+	NumBytes = IICPS_FIFO_DEPTH -
+		iicps_readreg(BaseAddress, IICPS_TRANS_SIZE_REG);
 
-	if (SendByteCount > AvailBytes) {
-		NumBytesToSend = AvailBytes;
+	if (SendByteCount > NumBytes) {
+		NumBytesToSend = NumBytes;
 	} else {
 		NumBytesToSend = SendByteCount;
 	}
 
-	/*
-	 * Fill FIFO with amount determined above.
-	 */
-	for (LoopCnt = 0; LoopCnt < NumBytesToSend; LoopCnt++) {
+	// Send data to FIFO
+	for (i = 0; i < NumBytesToSend; i++) {
 		iicps_sendbyte(BaseAddress);
 	}
 
 	return SendByteCount;
 }
 
-int iicps_master_sendpolled(u32 BaseAddr, u8 *MsgPtr,
-		 int ByteCount, u16 SlaveAddr)
+int iicps_master_sendpolled(u32 BaseAddr, u8 *MsgPtr, int ByteCount, u16 SlaveAddr)
 {
 	u32 status;
-	u32 Intrs;
 
-	/*
-	 * Assert validates the input arguments.
-	 */
 	SendBufferPtr = MsgPtr;
 	SendByteCount = ByteCount;
 
 	if (ByteCount > IICPS_FIFO_DEPTH)
-		iicps_writereg(BaseAddr, IICPS_CR_OFFSET,
-			iicps_readreg(BaseAddr, IICPS_CR_OFFSET) | IICPS_CR_HOLD);
+		iicps_writereg(BaseAddr, IICPS_CTRL_REG,
+			iicps_readreg(BaseAddr, IICPS_CTRL_REG) | IICPS_CR_HOLD);
 
 	iicps_setup_master(BaseAddr, TX);
 
-	/*
-	 * Intrs keeps all the error-related interrupts.
-	 */
-	Intrs = 0x244;
+	// Clear the interrupt status register before monitoring.
+	status = iicps_readreg(BaseAddr, IICPS_ISR_REG);
+	iicps_writereg(BaseAddr, IICPS_ISR_REG, status);
 
-	/*
-	 * Clear the interrupt status register before use it to monitor.
-	 */
-	status = iicps_readreg(BaseAddr, IICPS_ISR_OFFSET);
-	iicps_writereg(BaseAddr, IICPS_ISR_OFFSET, status);
-
-	/*
-	 * Transmit first FIFO full of data.
-	 */
+	// Transmit FIFO
 	TransmitFifoFill(BaseAddr);
 
-	iicps_writereg(BaseAddr, IICPS_ADDR_OFFSET, SlaveAddr);
+	iicps_writereg(BaseAddr, IICPS_ADDRESS_REG, SlaveAddr);
 
-	status = iicps_readreg(BaseAddr, IICPS_ISR_OFFSET);
+	status = iicps_readreg(BaseAddr, IICPS_ISR_REG);
 
-	/*
-	 * Continue sending as long as there is more data and
-	 * there are no errors.
-	 */
-	while ((SendByteCount > 0) &&
-		((status & Intrs) == 0)) {
-		status = iicps_readreg(BaseAddr, IICPS_SR_OFFSET);
-
-		/*
-		 * Wait until transmit FIFO is empty.
-		 */
+	// Continue sending
+	while (SendByteCount > 0 && (status & 0x244) == 0) {
+		status = iicps_readreg(BaseAddr, IICPS_STATUS_REG);
+		// Wait until FIFO is empty
 		if ((status & 0x40) != 0) {
-			status = iicps_readreg(BaseAddr, IICPS_ISR_OFFSET);
+			status = iicps_readreg(BaseAddr, IICPS_ISR_REG);
 			continue;
 		}
-
-		/*
-		 * Send more data out through transmit FIFO.
-		 */
+		// Send data to transmit FIFO.
 		TransmitFifoFill(BaseAddr);
 	}
 
-	/*
-	 * Check for completion of transfer.
-	 */
+	// Check the completion of transmission
 	while (!(status & 0x01)){
-
-		status = iicps_readreg(BaseAddr, IICPS_ISR_OFFSET);
-		/*
-		 * If there is an error, tell the caller.
-		 */
-		if ((status & Intrs) != 0) {
+		status = iicps_readreg(BaseAddr, IICPS_ISR_REG);
+		if ((status & 0x244) != 0) {
 			return PST_FAILURE;
 		}
 	}
 
-	iicps_writereg(BaseAddr, IICPS_CR_OFFSET,
-		iicps_readreg(BaseAddr,IICPS_CR_OFFSET) & ~IICPS_CR_HOLD);
+	iicps_writereg(BaseAddr, IICPS_CTRL_REG,
+		iicps_readreg(BaseAddr,IICPS_CTRL_REG) & ~IICPS_CR_HOLD);
 
 	return PST_SUCCESS;
 }
 
 
-int iicps_master_recvpolled(u32 BaseAddr, u8 *MsgPtr,
-				int ByteCount, u16 SlaveAddr)
+int iicps_master_recvpolled(u32 BaseAddr, u8 *MsgPtr, int ByteCount, u16 SlaveAddr)
 {
-	u32 Intrs;
 	u32 status;
 	int IsHold = 0;
 	int UpdateTxSize = 0;
 
-	/*
-	 * Assert validates the input arguments.
-	 */
 	RecvBufferPtr = MsgPtr;
 	RecvByteCount = ByteCount;
 
 	iicps_setup_master(BaseAddr, RX);
 
 	if(ByteCount > IICPS_FIFO_DEPTH) {
-		iicps_writereg(BaseAddr, IICPS_CR_OFFSET,
-			iicps_readreg(BaseAddr, IICPS_CR_OFFSET) | IICPS_CR_HOLD);
+		iicps_writereg(BaseAddr, IICPS_CTRL_REG,
+			iicps_readreg(BaseAddr, IICPS_CTRL_REG) | IICPS_CR_HOLD);
 		IsHold = 1;
 	}
 
-	/*
-	 * Clear the interrupt status register before use it to monitor.
-	 */
-	status = iicps_readreg(BaseAddr, IICPS_ISR_OFFSET);
-	iicps_writereg(BaseAddr, IICPS_ISR_OFFSET, status);
+	// Clear the interrupt status register before monitoring
+	status = iicps_readreg(BaseAddr, IICPS_ISR_REG);
+	iicps_writereg(BaseAddr, IICPS_ISR_REG, status);
 
-	iicps_writereg(BaseAddr, IICPS_ADDR_OFFSET, SlaveAddr);
+	iicps_writereg(BaseAddr, IICPS_ADDRESS_REG, SlaveAddr);
 
-	/*
-	 * Set up the transfer size register so the slave knows how much
-	 * to send to us.
-	 */
+	// Set up the transfer size register
 	if (ByteCount > IICPS_MAX_TRANSFER_SIZE) {
-		iicps_writereg(BaseAddr, IICPS_TRANS_SIZE_OFFSET, IICPS_MAX_TRANSFER_SIZE);
+		iicps_writereg(BaseAddr, IICPS_TRANS_SIZE_REG, IICPS_MAX_TRANSFER_SIZE);
 		ByteCount = IICPS_MAX_TRANSFER_SIZE;
 		UpdateTxSize = 1;
 	}else {
-		iicps_writereg(BaseAddr, IICPS_TRANS_SIZE_OFFSET, ByteCount);
+		iicps_writereg(BaseAddr, IICPS_TRANS_SIZE_REG, ByteCount);
 	}
 
-	/*
-	 * Intrs keeps all the error-related interrupts.
-	 */
-	Intrs = 0x2a4;
-
-	/*
-	 * Poll the interrupt status register to find the errors.
-	 */
-	status = iicps_readreg(BaseAddr, IICPS_ISR_OFFSET);
-	while ((RecvByteCount > 0) &&
-			((status & Intrs) == 0)) {
-		status = iicps_readreg(BaseAddr, IICPS_SR_OFFSET);
+	// Poll the interrupt status register
+	status = iicps_readreg(BaseAddr, IICPS_ISR_REG);
+	while ((RecvByteCount > 0) && ((status & 0x2a4) == 0)) {
+		status = iicps_readreg(BaseAddr, IICPS_STATUS_REG);
 
 		while (status & 0x20) {
 			if ((RecvByteCount < 14) && IsHold) {
 				IsHold = 0;
-				iicps_writereg(BaseAddr, IICPS_CR_OFFSET,
-						iicps_readreg(BaseAddr, IICPS_CR_OFFSET) & ~IICPS_CR_HOLD);
+				iicps_writereg(BaseAddr, IICPS_CTRL_REG,
+						iicps_readreg(BaseAddr, IICPS_CTRL_REG) & ~IICPS_CR_HOLD);
 			}
 			iicps_recvbyte(BaseAddr);
 			ByteCount --;
 
-			if (UpdateTxSize &&
-				(ByteCount == IICPS_FIFO_DEPTH + 1))
+			if (UpdateTxSize && (ByteCount == IICPS_FIFO_DEPTH + 1))
 				break;
 
-			status = iicps_readreg(BaseAddr, IICPS_SR_OFFSET);
+			status = iicps_readreg(BaseAddr, IICPS_STATUS_REG);
 		}
 
 		if (UpdateTxSize && (ByteCount == IICPS_FIFO_DEPTH + 1)) {
-			/*
-			 * wait while fifo is full
-			 */
-			while(iicps_readreg(BaseAddr,
-				IICPS_TRANS_SIZE_OFFSET) !=
-				(ByteCount - IICPS_FIFO_DEPTH));
+			// Wait while fifo is full
+			while(iicps_readreg(BaseAddr, IICPS_TRANS_SIZE_REG) != (ByteCount - IICPS_FIFO_DEPTH));
 
-			if ((RecvByteCount - IICPS_FIFO_DEPTH) >
-				IICPS_MAX_TRANSFER_SIZE) {
-
-				iicps_writereg(BaseAddr,
-					IICPS_TRANS_SIZE_OFFSET,
-					IICPS_MAX_TRANSFER_SIZE);
-				ByteCount = IICPS_MAX_TRANSFER_SIZE +
-						IICPS_FIFO_DEPTH;
+			if ((RecvByteCount - IICPS_FIFO_DEPTH) > IICPS_MAX_TRANSFER_SIZE) {
+				iicps_writereg(BaseAddr, IICPS_TRANS_SIZE_REG, IICPS_MAX_TRANSFER_SIZE);
+				ByteCount = IICPS_MAX_TRANSFER_SIZE + IICPS_FIFO_DEPTH;
 			}else {
-				iicps_writereg(BaseAddr,
-					IICPS_TRANS_SIZE_OFFSET,
-					RecvByteCount -
-					IICPS_FIFO_DEPTH);
+				iicps_writereg(BaseAddr, IICPS_TRANS_SIZE_REG, RecvByteCount - IICPS_FIFO_DEPTH);
 				UpdateTxSize = 0;
 				ByteCount = RecvByteCount;
 			}
 		}
 
-		status = iicps_readreg(BaseAddr, IICPS_ISR_OFFSET);
+		status = iicps_readreg(BaseAddr, IICPS_ISR_REG);
 	}
 
-	iicps_writereg(BaseAddr, IICPS_CR_OFFSET,
-			iicps_readreg(BaseAddr,IICPS_CR_OFFSET) & ~IICPS_CR_HOLD);
+	iicps_writereg(BaseAddr, IICPS_CTRL_REG,
+			iicps_readreg(BaseAddr,IICPS_CTRL_REG) & ~IICPS_CR_HOLD);
 
-	if (status & Intrs) {
+	if (status & 0x2a4) {
 		return PST_FAILURE;
 	}
 
@@ -396,14 +326,11 @@ int iicps_master_recvpolled(u32 BaseAddr, u8 *MsgPtr,
 
 int iicps_isbusy(u32 BaseAddress)
 {
-	u32 status;
-
-	status = iicps_readreg(BaseAddress, IICPS_SR_OFFSET);
-	if (status & 0x100) {
+	u32 status = iicps_readreg(BaseAddress, IICPS_STATUS_REG);
+	if (status & 0x100)
 		return 1;
-	}else {
-		return 0;
-	}
+
+	return 0;
 }
 
 int iicps_setsclk(u32 BaseAddress, u32 FsclHz)
@@ -422,64 +349,39 @@ int iicps_setsclk(u32 BaseAddress, u32 FsclHz)
 	u32 BestDivA = 0;
 	u32 BestDivB = 0;
 
-	if (iicps_readreg((BaseAddress), IICPS_TRANS_SIZE_OFFSET)) {
+	if (iicps_readreg((BaseAddress), IICPS_TRANS_SIZE_REG)) {
 		return PST_FAILURE;
 	}
 
-	/*
-	 * Assume Div_a is 0 and calculate (divisor_a+1) x (divisor_b+1).
-	 */
+	// Assume Div_a is 0 and calculate (divisor_a+1) x (divisor_b+1).
 	Temp = (InputClockHz) / (22 * FsclHz);
 
-	/*
-	 * If the answer is negative or 0, the Fscl input is out of range.
-	 */
-	if (0 == Temp) {
-		return PST_FAILURE;
-	}
-
-	/*
-	 * If frequency 400KHz is selected, 384.6KHz should be set.
-	 * If frequency 100KHz is selected, 90KHz should be set.
-	 * This is due to a hardware limitation.
-	 */
+	// If frequency 400KHz is selected, 384.6KHz should be set.
+	// If frequency 100KHz is selected, 90KHz should be set.
 	if(FsclHz > 384600) {
 		FsclHz = 384600;
-	}
-
-	if((FsclHz <= 100000) && (FsclHz > 90000)) {
+	} else if (FsclHz > 90000 && FsclHz <= 100000) {
 		FsclHz = 90000;
 	}
 
-	/*
-	 * TempLimit helps in iterating over the consecutive value of Temp to
-	 * find the closest clock rate achievable with divisors.
-	 * Iterate over the next value only if fractional part is involved.
-	 */
-	TempLimit = ((InputClockHz) % (22 * FsclHz)) ?
-							Temp + 1 : Temp;
+	// TempLimit helps in iterating over the consecutive value of Temp to
+	// find the closest clock rate achievable with divisors.
+	// Iterate over the next value only if fractional part is involved.
+	TempLimit = ((InputClockHz) % (22 * FsclHz)) ? Temp + 1 : Temp;
 	BestError = FsclHz;
 
-	for ( ; Temp <= TempLimit ; Temp++)
-	{
+	for ( ; Temp <= TempLimit ; Temp++) {
 		LastError = FsclHz;
 		CalcDivA = 0;
 		CalcDivB = 0;
 		CurrentError = 0;
-
 		for (Div_b = 0; Div_b < 64; Div_b++) {
-
 			Div_a = Temp / (Div_b + 1);
-
 			if (Div_a != 0)
 				Div_a = Div_a - 1;
-
 			if (Div_a > 3)
 				continue;
-
-			ActualFscl = (InputClockHz) /
-						(22 * (Div_a + 1) * (Div_b + 1));
-
+			ActualFscl = (InputClockHz) / (22 * (Div_a + 1) * (Div_b + 1));
 			if (ActualFscl > FsclHz)
 				CurrentError = (ActualFscl - FsclHz);
 			else
@@ -492,9 +394,7 @@ int iicps_setsclk(u32 BaseAddress, u32 FsclHz)
 			}
 		}
 
-		/*
-		 * Used to capture the best divisors.
-		 */
+		// Capture the best divisors.
 		if (LastError < BestError) {
 			BestError = LastError;
 			BestDivA = CalcDivA;
@@ -502,13 +402,11 @@ int iicps_setsclk(u32 BaseAddress, u32 FsclHz)
 		}
 	}
 
-	/*
-	 * Read the control register and mask the Divisors.
-	 */
-	ControlReg = iicps_readreg(BaseAddress, IICPS_CR_OFFSET);
+	// Read the control register and mask the Divisors.
+	ControlReg = iicps_readreg(BaseAddress, IICPS_CTRL_REG);
 	ControlReg &= 0xFFFF00FF;
 	ControlReg |= (BestDivA << 14) | (BestDivB << 8);
-	iicps_writereg(BaseAddress, IICPS_CR_OFFSET, ControlReg);
+	iicps_writereg(BaseAddress, IICPS_CTRL_REG, ControlReg);
 
 	return PST_SUCCESS;
 }
