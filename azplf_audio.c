@@ -13,14 +13,16 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/mman.h>
+#include <linux/i2c-dev.h>
 #include "azplf_hal.h"
 #include "azplf_util.h"
 #include "azplf_audio.h"
 
 static u32 pReg_i2s_drv = 0;
-static u32 pReg_iic = 0;
+static int pReg_iic = 0;
 
 #define INIT_COUNT		 11*2
 
@@ -149,10 +151,9 @@ u8 i2c_read1byte(u8 address)
 	u8 RecvBuffer[1] = {0x00};
 
 	SendBuffer[0] = address;
-	iicps_master_sendpolled(pReg_iic, SendBuffer, 1, SSM2603_IIC_ADDRESS);
-	while (iicps_isbusy(pReg_iic)) {}
-	iicps_master_recvpolled(pReg_iic, RecvBuffer, 1, SSM2603_IIC_ADDRESS);
-	while (iicps_isbusy(pReg_iic)) {}
+	write(pReg_iic, SendBuffer, 1);
+
+	read(pReg_iic, RecvBuffer, 1);
 	return (RecvBuffer[0]);
 }
 
@@ -162,27 +163,19 @@ void i2c_write1byte(u8 address, u8 data)
 
 	SendBuffer[0] = address;
 	SendBuffer[1] = data;
-	iicps_master_sendpolled(pReg_iic, SendBuffer, 2, SSM2603_IIC_ADDRESS);
-	while (iicps_isbusy(pReg_iic)) {}
+	write(pReg_iic, SendBuffer, 2);
 }
 
 int i2c_init(void)
 {
-	pReg_iic = iicps_config();
-    if (pReg_iic == 0 || pReg_iic == -1)
-    {
-    	printf("Error: invalid i2c driver address.\n");
-    	return -1;
-    }
-
-	iicps_setsclk(pReg_iic, 400000); // 400KHz
-
+	pReg_iic = open("/dev/i2c-0", O_RDWR);
+	ioctl(pReg_iic, I2C_SLAVE, SSM2603_IIC_ADDRESS);
 	return 0;
 }
 
 void i2c_deinit(void)
 {
-	if (pReg_iic) munmap((void *)pReg_iic, page_size);
+	close(pReg_iic);
 }
 
 void i2sout_init(void)

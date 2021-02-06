@@ -1,5 +1,5 @@
 PROGRAM = game_demo_audio
-OBJS = game_demo_audio.o azplf_audio.o iicps.o wav_util.o
+OBJS = game_demo_audio.o azplf_audio.o wav_util.o
 CC = arm-linux-gnueabihf-gcc
 CFLAGS = -g -I./lib/include
 LDFLAGS = -lpthread -L./lib -lazplf_hal -lazplf_util -lpng
@@ -26,6 +26,5 @@ clean :
 
 # header file dependency
 
-iicps.o: iicps.h
 azplf_audio.o: azplf_audio.h
 wav_util.o: wav_util.h
