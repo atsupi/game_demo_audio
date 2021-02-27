@@ -229,6 +229,7 @@ static void loadBitmapFiletoFB(u32 baseAddr)
 	Bitmap bmp;
 	printf("load reource file res/resource.png ...\n");
 	loadPngFile2Bitmap(&bmp, "./res/resource.png");
+//	loadBitmapFile("./res/resource.bmp", &bmp);
 	printf("done.\n");
 	printf("copy bitmap to resource frame buffer ...\n");
 	copyBitmapToFramebuffer((u32 *)baseAddr, bmp.data, 
@@ -601,7 +602,6 @@ int main(int argc, char *argv[])
 	printf("Initialize audio component\n");
 	azplf_audio_init();
 	azplf_audio_initSSM2603();
-//	i2sout_senddata(0, 0xFE000000); // debug=254 (no invert data), mute=0, lr_mode=R only
 	i2sout_senddata(0, 0xFF000000); // debug=255 (invert data), mute=0, lr_mode=R only
 
 	// Test conversion from bitmap to png

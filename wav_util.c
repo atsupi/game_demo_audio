@@ -16,9 +16,8 @@
 
 static int read1byte(FILE *fp, char *result, int len)
 {
-	int resp;
-	resp = fread(result, 1, len, fp);
-	return resp;
+	int data = fread(result, 1, len, fp);
+	return (data);
 }
 
 static int read2byte(FILE *fp, short *result)
@@ -40,13 +39,12 @@ static int read4byte(FILE *fp, u32 *result)
 int wav_readfile(WavHeader *header, char *fn)
 {
 	FILE *fp;
-	int ie;
+	int result;
 
 	fp = fopen(fn, "r");
 	printf("File opened with id(0x%x)\r\n", (unsigned int)fp);
 	read1byte(fp, header->RIFF, 4);
 	read4byte(fp, &header->riff_size);
-
 	read1byte(fp, header->riff_kind, 4);
 	read1byte(fp, header->fmt, 4);					// fmt chunk
 	read4byte(fp, &header->fmt_chnk);				// Nbytes of fmt chunk
@@ -66,10 +64,10 @@ int wav_readfile(WavHeader *header, char *fn)
 	read1byte(fp, header->data_chnk, 4);			// data chunk
 	read4byte(fp, &header->Nbyte);
 	header->data = calloc(header->Nbyte, sizeof(short));
-	if ((ie = read1byte(fp, (char *)header->data, header->Nbyte)) < header->Nbyte)
-		ie = 1;
+	if ((result = read1byte(fp, (char *)header->data, header->Nbyte)) < header->Nbyte)
+		result = 1;
 	fclose(fp);
-	return ie;
+	return (result);
 }
 
 void free_wavheader(WavHeader *header)
