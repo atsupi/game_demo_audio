@@ -3,8 +3,8 @@ The azplf is a platform running on [ZYBO](https://reference.digilentinc.com/refe
 ### Pre-requisites
 #### Hardware  
 1. ZYBO
-2. PC monitor (or LQ070 lcd display)
-3. HDMI cable
+2. LQ070 lcd display
+3. Pmod to LQ070 extention board
 4. Headphone
 
 ### How to build
