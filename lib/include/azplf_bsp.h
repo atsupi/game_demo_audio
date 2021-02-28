@@ -3,8 +3,9 @@
  *     Purpose:     azplf BSP header 
  *  Target Plf:     azplf (ZYBO learning platform) 
  *  Created on: 	2021/01/18 
+ * Modified on:     2021/02/27
  *      Author: 	atsupi.com 
- *     Version:		0.80 
+ *     Version:		1.00 
  ******************************************************/
 
 #ifndef AZPLF_BSP_H_
@@ -13,17 +14,21 @@
 // hardware definitions 
 #define XPAR_PS7_DDR_0_S_AXI_BASEADDR	0x00100000
 
+#define Use_GfxAccel
 #define XPAR_XGFXACCEL_0_BASEADDR		0x40000000
+
+#define Use_LQ070out
 #define XPAR_AXI_LQ070_OUT_0_BASEADDR	0x44A10000
 
+#define VDMA_INSTANCE_NUM				1
 #define XPAR_AXI_VDMA_0_BASEADDR		0x44A00000
 //#define XPAR_AXI_VDMA_1_BASEADDR		0x44A20000
 
-#define VDMA_INSTANCE_NUM				1
-
+#define IIC_INSTANCE_NUM				1
 #define IIC_BASEADDR					0xE0004000 // IICPS_I2C_0_BASEADDR
 //#define IIC_BASEADDR					0xE0005000 // IICPS_I2C_1_BASEADDR
 
+#define Use_I2Sout
 #define I2SOUT_BASEADDR					0x43C00000
 #define SSM2603_IIC_ADDRESS				0x1A
 
@@ -33,8 +38,13 @@
 #define PST_VDMA_MISMATCH_ERROR			(2)
 
 // display parameters 
+#ifdef (Use_LQ070out)
 #define DISP_WIDTH						800
 #define DISP_HEIGHT						480
+#else
+#define DISP_WIDTH						1024
+#define DISP_HEIGHT						768
+#endif
 
 // Definition for Frame buffer and Color
 // 10bit per color

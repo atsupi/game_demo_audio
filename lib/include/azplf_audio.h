@@ -2,9 +2,9 @@
  *    Filename:     azplf_audio.h 
  *     Purpose:     Audio generation for ZYBO (azplf) 
  *  Created on: 	2021/01/31
- * Modified on:
+ * Modified on:     2021/02/27
  *      Author: 	atsupi.com 
- *     Version:		0.80
+ *     Version:		1.00
  ******************************************************/
 
 #ifndef _AZPLF_AUDIO_H
@@ -13,6 +13,7 @@
 #include "azplf_bsp.h"
 #include "azplf_hal.h"
 #include "wav_util.h"
+#include "psg_util.h"
 
 #define REG_I2S_OUT(offset)		(*(volatile unsigned int *)(pReg_i2s_drv + (offset)))
 

@@ -19,12 +19,10 @@
 #include "azplf_bsp.h"
 #include "azplf_hal.h"
 #include "azplf_util.h"
-#include "azplf_audio.h"
 
 // Game definitions
-#define INITIAL_SCENE				0			// initial game scene number
-
-//extern int azplf_start_game_thread(int scene, fb_render_handler fb_renderer);
+#define INITIAL_SCENE				0					// initial game scene number
+#define BLUE_SCREEN					RGB8(20, 0, 192)	// blue screen color
 
 // Frame buffer addresses
 static u32 WriteFrameAddr[NUMBER_OF_FRAMES];
@@ -46,6 +44,7 @@ static int fbBackgd;
 static int wavfile_played = 0;
 static WavHeader wavheader;
 static int wav_pos = 0;
+static int def_volume = 10;
 
 static int quit = 0;
 
@@ -138,13 +137,13 @@ static u32 mapResourceFBtoMem(u32 baseAddr)
 	return (result);
 }
 
-void unmapResourceVirAddress(u32 virtAddress)
+static void unmapResourceVirAddress(u32 virtAddress)
 {
 	if (virtAddress)
 		munmap((void *)virtAddress, frame_page);
 }
 
-void drawTrianglePolygons(int fbNum)
+static void drawTrianglePolygons(int fbNum)
 {
 	pos points[] = {
 		{ 100, 100 },
@@ -210,17 +209,19 @@ static void copyBitmapToFramebuffer(u32 *dst, u32 *src, int width, int height, i
 {
 	int x, y;
 	u32 pix;
-	u32 *ptr = src;
+	u32 *sptr = src;
+	u32 *dptr = dst;
 	for (y = 0; y < height; y++)
 	{
 		for (x = 0; x < width; x++)
 		{
-			pix = ptr[x];
+			pix = sptr[x];
 			// Shift RGB bitmap to VDMA bitmap pixel data
 			pix = ((pix & 0xFF0000) << 6) | ((pix & 0xFF00) << 4) | ((pix & 0xFF) << 2);
-			*dst++ = pix;
+			dptr[x] = pix;
 		}
-		ptr += stride;
+		sptr += width;
+		dptr += stride;
 	}
 }
 
@@ -233,7 +234,7 @@ static void loadBitmapFiletoFB(u32 baseAddr)
 	printf("done.\n");
 	printf("copy bitmap to resource frame buffer ...\n");
 	copyBitmapToFramebuffer((u32 *)baseAddr, bmp.data, 
-		DISP_WIDTH, DISP_HEIGHT, DISP_WIDTH);
+		800, 480, DISP_WIDTH);
 	printf("done.\n");
 	if (bmp.data) free(bmp.data);
 }
@@ -247,14 +248,27 @@ static int parse_argument(int argc, char *argv[])
 	{
 		if (*argv[i] == '-' && *(argv[i]+1) == 's')
 		{
-			printf("  Shot mode enabled.\n");
-			mode = 1;
+			printf("  Skip start screen\n");
+			mode = 4;
 			break;
 		}
-		else if (*argv[i] == '-' && *(argv[i]+1) == 'd')
+		else if (*argv[i] == '-' && *(argv[i]+1) == 't')
 		{
-			printf("  Debug mode enabled.\n");
-			mode = 2;
+			printf("  Triangle mode enabled.\n");
+			mode = 3;
+			break;
+		}
+		else if (*argv[i] == '-' && *(argv[i]+1) == 'w')
+		{
+			printf("  Saw mode enabled.\n");
+			mode = 5;
+			break;
+		}
+		else if (*argv[i] == '-' && *(argv[i]+1) == 'v')
+		{
+			if (argc > i)
+				def_volume = atoi(argv[i+1]);
+			printf("  Set default volume to %d.\n", def_volume);
 			break;
 		}
 	}
@@ -602,7 +616,8 @@ int main(int argc, char *argv[])
 	printf("Initialize audio component\n");
 	azplf_audio_init();
 	azplf_audio_initSSM2603();
-	i2sout_senddata(0, 0xFF000000); // debug=255 (invert data), mute=0, lr_mode=R only
+	azplf_audio_set_volume(def_volume);
+	i2sout_senddata(0, 0xFF000000); // debug=255 (invert data), mute=0, lr_mode=LR
 
 	// Test conversion from bitmap to png
 //	TestPngFileConversion();

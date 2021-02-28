@@ -1,5 +1,5 @@
 LIBS = libazplf_hal.so
-OBJS = azplf_hal_main.o vdma.o gfxaccel.o lq070out.o font.o sprite.o game.o
+OBJS = azplf_hal_main.o azplf_audio.o vdma.o gfxaccel.o lq070out.o font.o sprite.o game.o wav_util.o psg_util.o
 CC = arm-linux-gnueabihf-gcc
 CFLAGS = -g  -shared -fPIC -I../include
 
@@ -27,6 +27,11 @@ lq070out.o: ../include/lq070out.h
 gfxaccel.o: ../include/gfxaccel.h
 font.o: ../include/font.h
 sprite.o: ../include/sprite.h
+
+# audio processing
+azplf_audio.o: ../include/azplf_audio.h
+wav_util.o: ../include/wav_util.h
+psg_util.o: ../include/psg_util.h
 
 # game core processing
 game.o: ../include/game.h

@@ -11,6 +11,7 @@
 #define AZPLF_HAL_H_
 
 #include "azplf_bsp.h"
+#include "azplf_audio.h"
 #include "vdma.h"
 #include "lq070out.h"
 #include "gfxaccel.h"

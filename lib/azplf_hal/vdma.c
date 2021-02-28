@@ -2,9 +2,9 @@
  *    Filename:     vdma.c 
  *     Purpose:     vdma controller driver 
  *  Created on: 	2015/04/05 
- * Modified on: 	2021/01/18 
+ * Modified on: 	2021/02/27 
  *      Author: 	atsupi.com 
- *     Version:		1.10 
+ *     Version:		1.20 
  ******************************************************/
 
 //#define DEBUG
@@ -21,7 +21,7 @@
 #define S2MM_VDMACR_INITIAL		0x00000289	// GenSrc=Internal;Genlock;Circular;Run
 
 static u32 page_size;
-u32 frame_page = 0x00200000; // 2MB page
+u32 frame_page = 0x00300000; // 3MB page
 
 uint32_t vdma_read_reg(u32 adr, u32 offset)
 {
