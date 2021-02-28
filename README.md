@@ -29,3 +29,6 @@ $ cp boot/* /mnt/ZYBO_BOOT
 ```
 ### License
 This work is licensed under a Creative Commons Zero v1.0 Universal License.
+
+### Link
+About ZYBO Embedded Linux, refer to the Digilent's blog [here](https://blog.digilentinc.com/zybo-embedded-linux-hands-on-tutorial/).
